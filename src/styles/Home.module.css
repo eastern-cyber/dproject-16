@@ -1,0 +1,25 @@
+.container {
+    width: 100%;
+    max-width: 1440px;
+    padding: 0 1rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.gradientText0 {
+    background: -webit-linear-gradient (#bfa3da, #84309c, #c735b0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.gradientText1 {
+    background: -webit-linear-gradient (#a79af9, #7aa8d2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
