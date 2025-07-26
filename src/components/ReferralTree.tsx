@@ -200,7 +200,7 @@ const ReferralTree: React.FC<ReferralTreeProps> = ({ referrerId }) => {
   useEffect(() => {
     const fetchPayoutData = async () => {
       try {
-        const res = await fetch('https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.1/main/public/CaringBonus-Payout-Success_Polygonscan.json');
+        const res = await fetch('https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/CaringBonus-Payout-Success_Polygonscan.json');
         const data = await res.json();
         setPayoutData(data);
       } catch (error) {
