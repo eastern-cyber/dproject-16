@@ -41,6 +41,7 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
     const [userPolMap, setUserPolMap] = useState<{ [key: string]: number }>({});
   
     const [returnBonusTotalPol, setReturnBonusTotalPol] = useState<number>(0);
+    const [latestReturnBonusDate, setLatestReturnBonusDate] = useState<string>("N/A");
 
     useEffect(() => {
       // Fetch the JSON data
@@ -96,32 +97,70 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
         });
     };
 
+    const formatUTCDate = (utcString: string): string => {
+    const date = new Date(utcString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+
+        // Add 7 hours for GMT+7 (Bangkok)
+        date.setUTCHours(date.getUTCHours() + 7);
+
+        const pad = (n: number) => n.toString().padStart(2, "0");
+
+        const day = pad(date.getUTCDate());
+        const month = pad(date.getUTCMonth() + 1);
+        const year = date.getUTCFullYear();
+        const hours = pad(date.getUTCHours());
+        const minutes = pad(date.getUTCMinutes());
+        const seconds = pad(date.getUTCSeconds());
+
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    };
+
+
+
     useEffect(() => {
     const fetchReturnBonusTransactions = async () => {
         try {
-        const response = await fetch("https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/ReturnBonus-Payout-Success_Polygonscan.json");
+        const response = await fetch(
+            "https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/ReturnBonus-Payout-Success_Polygonscan.json"
+        );
         const data: TransactionData[] = await response.json();
 
         const matchingTo = matchingUser?.userId?.toLowerCase();
 
         if (!matchingTo) {
             setReturnBonusTotalPol(0);
+            setLatestReturnBonusDate("N/A");
             return;
         }
 
-        const total = data
-            .filter(tx => tx.To.toLowerCase() === matchingTo)
-            .reduce((sum, tx) => sum + parseFloat(tx["Value_OUT(POL)"] || "0"), 0);
+        const matchingTxs = data.filter((tx) => tx.To.toLowerCase() === matchingTo);
 
+        const total = matchingTxs.reduce(
+            (sum, tx) => sum + parseFloat(tx["Value_OUT(POL)"] || "0"),
+            0
+        );
         setReturnBonusTotalPol(total);
+
+        if (matchingTxs.length > 0) {
+            const latestTx = matchingTxs[matchingTxs.length - 1]; // last one is the latest
+            const rawDate = latestTx["DateTime (UTC)"];
+
+            const formattedDate = formatUTCDate(rawDate); // Use helper below
+            setLatestReturnBonusDate(formattedDate);
+        } else {
+            setLatestReturnBonusDate("N/A");
+        }
         } catch (error) {
         console.error("Error fetching Return Bonus Payout JSON:", error);
         setReturnBonusTotalPol(0);
+        setLatestReturnBonusDate("N/A");
         }
     };
 
     fetchReturnBonusTransactions();
     }, [matchingUser]);
+
 
     // Add useEffect and pagination logic
     const [currentPage, setCurrentPage] = useState(1);
@@ -337,7 +376,7 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
                                         const directReturn = total + returnKeep;
 
                                         const formatNumber = (num: number) =>
-                                            (Object.is(num, -0) ? 0 : num).toLocaleString('en-US', {
+                                            (Math.abs(num) < 1e-6 ? 0 : num).toLocaleString('en-US', {
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                         });
@@ -405,13 +444,13 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
                                 <th className="border border-gray-400 px-4 py-2 text-center">
                                     <p className="text-[19px]">
                                         รับครั้งล่าสุด<br />
-                                        {/* <Link
+                                        <Link
                                             href={`https://polygonscan.com/address/${referrerId}`}
                                             className="text-[18px] text-blue-300 hover:text-red-500"
                                             target="_blank"
                                         >
-                                            <p className="mt-3">{latestSentDate}</p>
-                                        </Link> */}
+                                            <p className="mt-3">{latestReturnBonusDate}</p>
+                                        </Link>
                                     </p>
                                 </th>
                             </tr>
