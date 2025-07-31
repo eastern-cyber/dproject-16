@@ -40,6 +40,8 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
     const [transactionData, setTransactionData] = useState<TransactionData[]>([]);
     const [userPolMap, setUserPolMap] = useState<{ [key: string]: number }>({});
   
+    const [returnBonusTotalPol, setReturnBonusTotalPol] = useState<number>(0);
+
     useEffect(() => {
       // Fetch the JSON data
       fetch("https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.1/main/public/CaringBonus-Payout-Success_Polygonscan.json")
@@ -93,6 +95,33 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
             hour12: false,
         });
     };
+
+    useEffect(() => {
+    const fetchReturnBonusTransactions = async () => {
+        try {
+        const response = await fetch("https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/ReturnBonus-Payout-Success_Polygonscan.json");
+        const data: TransactionData[] = await response.json();
+
+        const matchingTo = matchingUser?.userId?.toLowerCase();
+
+        if (!matchingTo) {
+            setReturnBonusTotalPol(0);
+            return;
+        }
+
+        const total = data
+            .filter(tx => tx.To.toLowerCase() === matchingTo)
+            .reduce((sum, tx) => sum + parseFloat(tx["Value_OUT(POL)"] || "0"), 0);
+
+        setReturnBonusTotalPol(total);
+        } catch (error) {
+        console.error("Error fetching Return Bonus Payout JSON:", error);
+        setReturnBonusTotalPol(0);
+        }
+    };
+
+    fetchReturnBonusTransactions();
+    }, [matchingUser]);
 
     // Add useEffect and pagination logic
     const [currentPage, setCurrentPage] = useState(1);
@@ -314,30 +343,60 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
                                         });
 
                                         return (
-                                        <>
-                                            <p className="text-[18px]">
-                                            ยอดรวม
-                                            <span className="text-[24px] text-yellow-500 animate-blink">
-                                                &nbsp;{formatNumber(directReturn)}&nbsp;
-                                            </span>{' '}
-                                            POL
-                                            </p>
-                                            <p className="text-[18px]">
-                                             เก็บสะสม 25%{' '}
-                                            <span className="text-[24px] text-yellow-500 animate-blink">
-                                                &nbsp;{formatNumber(returnKeep)}&nbsp;
-                                            </span>{' '}
-                                            POL
-                                            </p>
-                                            <p className="text-[18px]">
-                                            ยอดรับ{' '}
-                                            <span className="text-[24px] text-yellow-500 animate-blink">
-                                                &nbsp;{formatNumber(total)}&nbsp;
-                                            </span>{' '}
-                                            POL
-                                            </p>
-                                        </>
-                                        );
+                                            (() => {
+                                                const total = grandTotalPol;
+                                                const returnKeep = (total / 75) * 25;
+                                                const directReturn = total + returnKeep;
+                                                const received = returnBonusTotalPol;
+                                                const newAmount = total - received;
+
+                                                const formatNumber = (num: number) =>
+                                                num.toLocaleString('en-US', {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                });
+
+                                                return (
+                                                <>
+                                                    <p className="text-[18px]">
+                                                    ยอดรวม
+                                                    <span className="text-[24px] text-yellow-500 animate-blink">
+                                                        &nbsp;{formatNumber(directReturn)}&nbsp;
+                                                    </span>{' '}
+                                                    POL
+                                                    </p>
+                                                    <p className="text-[18px]">
+                                                     เก็บสะสม 25%{' '}
+                                                    <span className="text-[24px] text-yellow-500 animate-blink">
+                                                        &nbsp;{formatNumber(returnKeep)}&nbsp;
+                                                    </span>{' '}
+                                                    POL
+                                                    </p>
+                                                    <p className="text-[18px]">
+                                                    ยอดรับ{' '}
+                                                    <span className="text-[24px] text-yellow-500 animate-blink">
+                                                        &nbsp;{formatNumber(total)}&nbsp;
+                                                    </span>{' '}
+                                                    POL
+                                                    </p>
+                                                    <p className="text-[18px]">
+                                                    รับแล้ว
+                                                    <span className="text-[24px] text-yellow-500 animate-blink">
+                                                        &nbsp;{formatNumber(received)}&nbsp;
+                                                    </span>{' '}
+                                                    POL
+                                                    </p>
+                                                    <p className="text-[18px]">
+                                                     ยอดใหม่{' '}
+                                                    <span className="text-[24px] text-yellow-500 animate-blink">
+                                                        &nbsp;{formatNumber(newAmount)}&nbsp;
+                                                    </span>{' '}
+                                                    POL
+                                                    </p>
+                                                </>
+                                                );
+                                            })()
+                                            );
                                     })()}
                                 </th>
                             </tr>
