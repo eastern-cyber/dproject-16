@@ -337,10 +337,11 @@ const ReturnBonusData: React.FC<Props> = ({ referrerId, setReferrerId, users, re
                                         const directReturn = total + returnKeep;
 
                                         const formatNumber = (num: number) =>
-                                        num.toLocaleString('en-US', {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
+                                            (Object.is(num, -0) ? 0 : num).toLocaleString('en-US', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
                                         });
+
 
                                         return (
                                             (() => {
