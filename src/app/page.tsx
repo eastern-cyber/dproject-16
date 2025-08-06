@@ -136,8 +136,8 @@ function Header() {
         &nbsp;
         <span className="inline-block -skew-x-6 text-white"> Register </span>
       </h2>
-      <p className="text-center text-zinc-200 md:mb-25 text-base m-2 break-word">
-        Version 1.2.15
+      <p className="text-[24px] text-center text-zinc-200 md:mb-25 text-base m-2 break-word">
+        Version 1.2.16
       </p>
       <p className="text-center text-zinc-300 text-base m-8 break-word">
         ล็อกอินด้วยอีเมลล์{" "}
