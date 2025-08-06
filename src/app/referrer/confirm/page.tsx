@@ -107,11 +107,17 @@ const ConfirmPage = () => {
           </TransactionButton>
         </div>
         <p className="text-center text-[18px]">
-          <b>ค่าสมาชิก: <span className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB</span></b><br />
+          <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
           {exchangeRate && (
             <>
-              <span className="text-[16px]">
-                (≈ {calculatePolAmount()} POL @ {exchangeRate.toFixed(2)} THB/POL)
+                &nbsp; ( ≈ {calculatePolAmount()} POL )
+            </>
+          )}
+          </p></b>
+          {exchangeRate && (
+            <>
+              <span className="text-[17px]">
+                อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
               </span><br />
             </>
           )}
@@ -121,8 +127,10 @@ const ConfirmPage = () => {
           {error && (
             <span className="text-sm text-red-500">{error}</span>
           )}
+          <p><br />
           เพื่อสนับสนุน <b>แอพพลิเคชั่น <span className="text-[26px] text-red-600">ก๊อกๆๆ</span></b> <br />
-          ถือเป็นการยืนยันสถานภาพ<br /> 
+          ถือเป็นการยืนยันสถานภาพ
+          </p>
           <span className="text-yellow-500 text-[22px]">
             <b>&quot;สมาชิกพรีเมี่ยม&quot;</b>
           </span><br />
