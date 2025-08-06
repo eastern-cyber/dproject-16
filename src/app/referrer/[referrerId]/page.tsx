@@ -37,7 +37,7 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
         }
     }, [params.referrerId]);
 
-    const navigateToMintingPage = () => {
+    const navigateToConfirmPage = () => {
         const data = {
             var1: params.referrerId || "N/A", // Referrer ID from params
             var2: referrerData?.email || "N/A", // Email from referrerData
@@ -48,8 +48,8 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
         // Store data in sessionStorage before navigation
         sessionStorage.setItem("mintingsData", JSON.stringify(data));
 
-        // Navigate to minting page without exposing variables in the URL
-        router.push("/referrer/minting");
+        // Navigate to confirmation page instead of minting page
+        router.push("/referrer/confirm");
     };
 
     return (
@@ -87,12 +87,6 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
                         }}
                         supportedTokens={{
                         [chain.id]: [
-                            // {
-                            //     address: "0xca23b56486035e14F344d6eb591DC27274AF3F47",
-                            //     name: "DProject",
-                            //     symbol: "DFI",
-                            //     icon: "https://dfi.fund/_next/static/media/DFastLogo_650x600.4f2ec315.svg",
-                            // },
                             {
                                 address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
                                 name: "USDC",
@@ -135,7 +129,6 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
                         <b>ขณะนี้ ท่านกำลังดำเนินการสมัครสมาชิก ภายใต้การแนะนำของ</b>
                     </p>
                     {referrerData ? (
-                        // <div className="text-center text-[18px] bg-gray-900 p-4 border border-1 border-zinc-300">
                         <div className="mt-4 text-center gap-6 bg-gray-900 p-4 border border-1 border-gray-400">
                             <p className="text-lg text-gray-300">
                                 <b>เลขกระเป๋าผู้แนะนำ:</b> {params.referrerId ? `${params.referrerId.slice(0, 6)}...${params.referrerId.slice(-4)}` : "ไม่พบกระเป๋า"}<br />
@@ -162,7 +155,7 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
                     </div>
                 </div>
                 <div className="flex flex-col items-center mb-6">
-                    <button onClick={navigateToMintingPage} className="flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg bg-red-700 hover:bg-zinc-800 transition-colors hover:border-zinc-400">
+                    <button onClick={navigateToConfirmPage} className="flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg bg-red-700 hover:bg-zinc-800 transition-colors hover:border-zinc-400">
                         ดำเนินการต่อ
                     </button>
                 </div>
