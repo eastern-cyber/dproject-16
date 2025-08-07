@@ -1,22 +1,20 @@
 "use client";
 
-import { chain } from "@/app/chain";
 import { client } from "@/app/client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { ConnectButton, TransactionButton, useActiveAccount, useReadContract } from "thirdweb/react";
+import { inAppWallet, walletConnect } from "thirdweb/wallets";
+import WalletConnect from "@/components/WalletConnect";
+import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import dprojectIcon from "@public/DProjectLogo_650x600.svg";
-import { claimTo as claimERC1155, balanceOf as balanceOfERC1155 } from "thirdweb/extensions/erc1155";
 import { defineChain, getContract } from "thirdweb";
 import { polygon } from "thirdweb/chains";
-import { contract } from "../../../../utils/contracts";
-import Link from "next/link";
-import { inAppWallet, createWallet } from "thirdweb/wallets";
-import WalletConnect from "@/components/WalletConnect";
 import Footer from "@/components/Footer";
+import { prepareContractCall, toWei, sendTransaction, readContract } from "thirdweb";
+import { PlanAConfirmModal } from "@/components/planAconfirmModal";
 
 // Constants
-const NFT_CONTRACT_ADDRESS = "0xf96190438548F0A6D6C3116D8e57058AB76DC986";
+const RECIPIENT_ADDRESS = "0x3BBf139420A8Ecc2D06c64049fE6E7aE09593944";
 const MEMBERSHIP_FEE_THB = 400;
 const EXCHANGE_RATE_REFRESH_INTERVAL = 300000; // 5 minutes in ms
 
@@ -32,7 +30,48 @@ const ConfirmPage = () => {
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [polBalance, setPolBalance] = useState<string>("0");
   const account = useActiveAccount();
+
+  // Fetch wallet balance when account changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!account) {
+        setPolBalance("0");
+        return;
+      }
+      
+      try {
+        const balanceResult = await readContract({
+          contract: getContract({
+            client,
+            chain: defineChain(polygon),
+            address: "0x0000000000000000000000000000000000001010" // Native MATIC token address
+          }),
+          method: {
+            type: "function",
+            name: "balanceOf",
+            inputs: [{ type: "address", name: "owner" }],
+            outputs: [{ type: "uint256" }],
+            stateMutability: "view"
+          },
+          params: [account.address]
+        });
+
+        // Convert balance from wei to POL (MATIC)
+        const balanceInPOL = Number(balanceResult) / 10**18;
+        setPolBalance(balanceInPOL.toFixed(4));
+      } catch (err) {
+        console.error("Error fetching balance:", err);
+        setPolBalance("0");
+      }
+    };
+
+    fetchBalance();
+  }, [account]);
 
   // Fetch THB to POL exchange rate (MATIC price in THB)
   useEffect(() => {
@@ -74,115 +113,159 @@ const ConfirmPage = () => {
   const calculatePolAmount = () => {
     if (!exchangeRate) return null;
     const polAmount = MEMBERSHIP_FEE_THB / exchangeRate;
-    return polAmount.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4
-    });
+    return polAmount.toFixed(4); // Return as string with 4 decimal places
   };
 
-  const ClaimButtons = () => {
-    const nftContract = getContract({
-      client,
-      chain: defineChain(polygon),
-      address: NFT_CONTRACT_ADDRESS
-    });
+  const handleConfirmTransaction = async () => {
+    if (!account || !exchangeRate) return;
+    
+    setIsProcessing(true);
+    try {
+      const polAmount = calculatePolAmount();
+      if (!polAmount) throw new Error("Unable to calculate POL amount");
 
-    return (
-      <div className="flex flex-col gap-4 md:gap-8">
-        <p className="mt-4 text-center text-[18px]">กดปุ่ม</p>
-        <div className="flex flex-col gap-2 md:gap-4">
-          <TransactionButton
-            className="flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg bg-red-700 hover:bg-red-800 hover:border-zinc-400 transition-colors"
-            transaction={() => claimERC1155({
-              contract: nftContract,
-              to: account?.address || "",
-              tokenId: BigInt(data?.var4 || "0"),
-              quantity: 1n
-            })}
-            onTransactionConfirmed={() => {
-              alert("การยืนยันเรียบร้อยแล้ว");
-            }}
-          >
-            <span className="text-[18px]">ยืนยัน</span>
-          </TransactionButton>
-        </div>
-        <p className="text-center text-[18px]">
-          <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
-          {exchangeRate && (
-            <>
-                &nbsp; ( ≈ {calculatePolAmount()} POL )
-            </>
-          )}
-          </p></b>
-          {exchangeRate && (
-            <>
-              <span className="text-[17px]">
-                อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
-              </span><br />
-            </>
-          )}
-          {loading && !error && (
-            <span className="text-sm text-gray-400">กำลังโหลดอัตราแลกเปลี่ยน...</span>
-          )}
-          {error && (
-            <span className="text-sm text-red-500">{error}</span>
-          )}
-          <p><br />
-          เพื่อสนับสนุน <b>แอพพลิเคชั่น <span className="text-[26px] text-red-600">ก๊อกๆๆ</span></b> <br />
-          ถือเป็นการยืนยันสถานภาพ
-          </p>
-          <span className="text-yellow-500 text-[22px]">
-            <b>&quot;สมาชิกพรีเมี่ยม&quot;</b>
-          </span><br />
-          ภายใต้การแนะนำของ<br />
-        </p>
-        {data && (
-          <div className="text-center text-[18px] bg-gray-900 p-4 border border-zinc-300 rounded-lg">
-            <p className="text-lg text-gray-300">
-              <b>เลขกระเป๋าผู้แนะนำ:</b> {data.var1.slice(0, 6)}...{data.var1.slice(-4)}
-            </p>
-            <p className="text-lg text-gray-300 mt-2">
-              <b>อีเมล:</b> {data.var2}
-            </p>
-            <p className="text-lg text-gray-300 mt-2">
-              <b>ชื่อ:</b> {data.var3}
-            </p>
-            <p className="text-lg text-red-500 mt-2">
-              <b>Token ID: {data.var4}</b>
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const WalletBalances = () => {
-    const { data: nftBalance } = useReadContract(
-      balanceOfERC1155,
-      {
+      // Create a simple value transfer transaction
+      const transaction = prepareContractCall({
         contract: getContract({
           client,
           chain: defineChain(polygon),
-          address: NFT_CONTRACT_ADDRESS
+          address: account.address
         }),
-        owner: account?.address || "",
-        tokenId: BigInt(data?.var4 || "0")
-      }
-    );
+        method: {
+          type: "function",
+          name: "transfer",
+          inputs: [
+            { type: "address", name: "to" },
+            { type: "uint256", name: "value" }
+          ],
+          outputs: [{ type: "bool" }],
+          stateMutability: "payable"
+        },
+        params: [RECIPIENT_ADDRESS, toWei(polAmount)],
+        value: BigInt(toWei(polAmount)) // Include the value to send
+      });
 
-    if (!nftBalance || nftBalance <= 0) return null;
+      // Send the transaction
+      const { transactionHash } = await sendTransaction({
+        transaction,
+        account: account
+      });
 
-    return (
-      <div className="flex flex-col items-center mt-6">
-        <Link
-          className="flex flex-col mt-8 border border-zinc-500 px-4 py-3 rounded-lg hover:bg-red-800 transition-colors hover:border-zinc-800 text-center"
-          href="/premium-area/"
-        >
-          เข้าพื้นที่สมาชิกพรีเมี่ยม
-        </Link>
-      </div>
-    );
+      setTxHash(transactionHash);
+
+      // Create confirmation report
+      const now = new Date();
+      const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // GMT+7
+      const formattedDate = bkkTime.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/\//g, '/');
+
+      const report = {
+        senderAddress: account.address,
+        dateTime: formattedDate,
+        referrer: data?.var1 || "",
+        transactionHash: transactionHash,
+        amountPOL: polAmount,
+        amountTHB: MEMBERSHIP_FEE_THB
+      };
+
+      // Download report as JSON
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'planAconfirmReport.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert("การยืนยันเรียบร้อยแล้ว");
+    } catch (err) {
+      console.error("Transaction failed:", err);
+      alert("การทำรายการล้มเหลว: " + (err as Error).message);
+    } finally {
+      setIsProcessing(false);
+      setShowConfirmationModal(false);
+    }
   };
+
+const ClaimButtons = () => {
+  return (
+    <div className="flex flex-col gap-4 md:gap-8">
+      <p className="mt-4 text-center text-[18px]">
+        <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
+        {exchangeRate && (
+          <>
+              &nbsp; ( ≈ {calculatePolAmount()} POL )
+          </>
+        )}
+        </p></b>
+        {exchangeRate && (
+          <>
+            <span className="text-[17px]">
+              อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
+            </span><br />
+          </>
+        )}
+        {loading && !error && (
+          <span className="text-sm text-gray-400">กำลังโหลดอัตราแลกเปลี่ยน...</span>
+        )}
+        {error && (
+          <span className="text-sm text-red-500">{error}</span>
+        )}
+      </p>
+      {/* <p className="mt-4 text-center text-[18px]">กดปุ่ม</p> */}
+      <div className="flex flex-col gap-2 md:gap-4">
+        <button
+          className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
+            !account || !exchangeRate || isProcessing
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
+          }`}
+          onClick={() => setShowConfirmationModal(true)}
+          disabled={!account || !exchangeRate || isProcessing}
+        >
+          <span className="text-[18px]">
+            {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
+          </span>
+        </button>
+      </div>
+      <p className="text-center text-[18px]">
+        <p>
+        เพื่อสนับสนุน <b>แอพพลิเคชั่น <span className="text-[26px] text-red-600">ก๊อกๆๆ</span></b> <br />
+        ถือเป็นการยืนยันสถานภาพ
+        </p>
+        <span className="text-yellow-500 text-[22px]">
+          <b>&quot;สมาชิกพรีเมี่ยม&quot;</b>
+        </span><br />
+        ภายใต้การแนะนำของ<br />
+      </p>
+      {data && (
+        <div className="text-center text-[18px] bg-gray-900 p-4 border border-zinc-300 rounded-lg">
+          <p className="text-lg text-gray-300">
+            <b>เลขกระเป๋าผู้แนะนำ:</b> {data.var1.slice(0, 6)}...{data.var1.slice(-4)}
+          </p>
+          <p className="text-lg text-gray-300 mt-2">
+            <b>อีเมล:</b> {data.var2}
+          </p>
+          <p className="text-lg text-gray-300 mt-2">
+            <b>ชื่อ:</b> {data.var3}
+          </p>
+          <p className="text-lg text-red-500 mt-2">
+            <b>Token ID: {data.var4}</b>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
   return (
     <main className="p-4 pb-10 min-h-[100vh] flex flex-col items-center bg-gray-950">
@@ -206,7 +289,53 @@ const ConfirmPage = () => {
           <>
             <div className="flex flex-col items-center justify-center w-full p-2 m-2">
               <ClaimButtons />
-              <WalletBalances />
+              
+              {/* Confirmation Modal */}
+              {showConfirmationModal && (
+                <PlanAConfirmModal onClose={() => setShowConfirmationModal(false)}>
+                  <div className="p-6 bg-gray-900 rounded-lg border border-gray-700 max-w-md">
+                    <h3 className="text-xl font-bold mb-4 text-center">ยืนยันการชำระ</h3>
+                    <div className="mb-6 text-center">
+                      <p className="text-lg">
+                        คุณกำลังจะชำระค่าสมาชิกจำนวน<br />
+                        <span className="text-yellow-500 text-2xl font-bold">
+                          {MEMBERSHIP_FEE_THB} THB (≈ {calculatePolAmount()} POL)
+                        </span>
+                      </p>
+                      {account && (
+                        <p className="mt-3 text-sm">
+                          POL ในกระเป๋าของคุณ: <span className="text-green-400">{polBalance}</span>
+                        </p>
+                      )}
+                      {account && parseFloat(polBalance) < parseFloat(calculatePolAmount() || "0") && (
+                        <p className="mt-2 text-red-400 text-sm">
+                          ⚠️ จำนวน POL ในกระเป๋าของคุณไม่เพียงพอ
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        className={`px-6 py-3 rounded-lg font-medium ${
+                          !account || parseFloat(polBalance) < parseFloat(calculatePolAmount() || "0")
+                            ? "bg-gray-600 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700"
+                        }`}
+                        onClick={handleConfirmTransaction}
+                        disabled={!account || isProcessing || parseFloat(polBalance) < parseFloat(calculatePolAmount() || "0")}
+                      >
+                        {isProcessing ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
+                      </button>
+                      <button
+                        className="px-6 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg"
+                        onClick={() => setShowConfirmationModal(false)}
+                        disabled={isProcessing}
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                </PlanAConfirmModal>
+              )}
             </div>
             <div className="w-full text-center flex flex-col items-center justify-center p-3 m-2 border border-gray-800 rounded-lg break-all">
               <p className="mb-4 font-medium"><u>ข้อมูลเพื่อการตรวจสอบระบบ</u></p> 
