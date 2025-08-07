@@ -6,7 +6,6 @@ import { client } from "@/app/client";
 import React from "react";
 import {
     inAppWallet,
-    walletConnect,
     createWallet,
 } from "thirdweb/wallets";
 
@@ -16,14 +15,13 @@ const WalletConnect: React.FC = () => {
             <ConnectButton locale={"en_US"} 
                 client={client}
                 chain={chain}
-                wallets={[
-                    inAppWallet({
-                        auth: {
-                            options: ["email"]
-                        }
-                    }),
-                    createWallet("io.metamask") // This is how you add MetaMask
-                ]}
+                wallets={[ inAppWallet ({
+                auth: {
+                    options: [
+                        "email",
+                    ]
+                    }
+                }) ]}
                 connectButton={{ label: "ล็อกอิน" }}
                 connectModal={{
                     title: "เชื่อมต่อกระเป๋า",

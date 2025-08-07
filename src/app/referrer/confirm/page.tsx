@@ -257,6 +257,9 @@ const ConfirmPage = () => {
             <p className="text-lg text-gray-300 mt-2">
               <b>ชื่อ:</b> {data.var3}
             </p>
+            <p className="text-lg text-red-500 mt-2">
+            <b>Token ID: {data.var4}</b>
+          </p>            
           </div>
         )}
       </div>
@@ -338,6 +341,7 @@ const ConfirmPage = () => {
               <p className="mb-3">เลขกระเป๋าผู้แนะนำ:<br /> {data.var1}</p>
               <p className="mb-3">อีเมล: {data.var2}</p>
               <p className="mb-3">ชื่อ: {data.var3}</p>
+              <p>TokenId: {data.var4}</p>
             </div>
           </>
         ) : (
