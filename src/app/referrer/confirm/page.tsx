@@ -117,39 +117,39 @@ const ConfirmPage = () => {
   };
 
   const handleConfirmTransaction = async () => {
-    if (!account || !exchangeRate) return;
-    
-    setIsProcessing(true);
-    try {
-      const polAmount = calculatePolAmount();
-      if (!polAmount) throw new Error("Unable to calculate POL amount");
+  if (!account || !exchangeRate) return;
+  
+  setIsProcessing(true);
+  try {
+    const polAmount = calculatePolAmount();
+    if (!polAmount) throw new Error("Unable to calculate POL amount");
 
-      // Create a simple value transfer transaction
-      const transaction = prepareContractCall({
-        contract: getContract({
-          client,
-          chain: defineChain(polygon),
-          address: account.address
-        }),
-        method: {
-          type: "function",
-          name: "transfer",
-          inputs: [
-            { type: "address", name: "to" },
-            { type: "uint256", name: "value" }
-          ],
-          outputs: [{ type: "bool" }],
-          stateMutability: "payable"
-        },
-        params: [RECIPIENT_ADDRESS, toWei(polAmount)],
-        value: BigInt(toWei(polAmount)) // Include the value to send
-      });
+    // Create a prepared transaction for simple value transfer
+    const transaction = prepareContractCall({
+      contract: getContract({
+        client,
+        chain: defineChain(polygon),
+        address: "0x0000000000000000000000000000000000001010" // Native token address
+      }),
+      method: {
+        type: "function",
+        name: "transfer",
+        inputs: [
+          { type: "address", name: "to" },
+          { type: "uint256", name: "value" }
+        ],
+        outputs: [{ type: "bool" }],
+        stateMutability: "payable"
+      },
+      params: [RECIPIENT_ADDRESS, toWei(polAmount)],
+      value: BigInt(toWei(polAmount))
+    });
 
-      // Send the transaction
-      const { transactionHash } = await sendTransaction({
-        transaction,
-        account: account
-      });
+    // Send the transaction
+    const { transactionHash } = await sendTransaction({
+      transaction,
+      account: account
+    });
 
       setTxHash(transactionHash);
 
@@ -186,7 +186,7 @@ const ConfirmPage = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert("การยืนยันเรียบร้อยแล้ว");
+      alert("การชำระเงินเรียบร้อยแล้ว");
     } catch (err) {
       console.error("Transaction failed:", err);
       alert("การทำรายการล้มเหลว: " + (err as Error).message);
@@ -196,76 +196,72 @@ const ConfirmPage = () => {
     }
   };
 
-const ClaimButtons = () => {
-  return (
-    <div className="flex flex-col gap-4 md:gap-8">
-      <p className="mt-4 text-center text-[18px]">
-        <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
-        {exchangeRate && (
-          <>
-              &nbsp; ( ≈ {calculatePolAmount()} POL )
-          </>
-        )}
-        </p></b>
-        {exchangeRate && (
-          <>
-            <span className="text-[17px]">
-              อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
-            </span><br />
-          </>
-        )}
-        {loading && !error && (
-          <span className="text-sm text-gray-400">กำลังโหลดอัตราแลกเปลี่ยน...</span>
-        )}
-        {error && (
-          <span className="text-sm text-red-500">{error}</span>
-        )}
-      </p>
-      {/* <p className="mt-4 text-center text-[18px]">กดปุ่ม</p> */}
-      <div className="flex flex-col gap-2 md:gap-4">
-        <button
-          className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
-            !account || !exchangeRate || isProcessing
-              ? "bg-gray-600 cursor-not-allowed"
-              : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
-          }`}
-          onClick={() => setShowConfirmationModal(true)}
-          disabled={!account || !exchangeRate || isProcessing}
-        >
-          <span className="text-[18px]">
-            {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
-          </span>
-        </button>
-      </div>
-      <p className="text-center text-[18px]">
-        <p>
-        เพื่อสนับสนุน <b>แอพพลิเคชั่น <span className="text-[26px] text-red-600">ก๊อกๆๆ</span></b> <br />
-        ถือเป็นการยืนยันสถานภาพ
+  const PaymentButton = () => {
+    return (
+      <div className="flex flex-col gap-4 md:gap-8">
+        <p className="mt-4 text-center text-[18px]">
+          <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
+          {exchangeRate && (
+            <>
+                &nbsp; ( ≈ {calculatePolAmount()} POL )
+            </>
+          )}
+          </p></b>
+          {exchangeRate && (
+            <>
+              <span className="text-[17px]">
+                อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
+              </span><br />
+            </>
+          )}
+          {loading && !error && (
+            <span className="text-sm text-gray-400">กำลังโหลดอัตราแลกเปลี่ยน...</span>
+          )}
+          {error && (
+            <span className="text-sm text-red-500">{error}</span>
+          )}
         </p>
-        <span className="text-yellow-500 text-[22px]">
-          <b>&quot;สมาชิกพรีเมี่ยม&quot;</b>
-        </span><br />
-        ภายใต้การแนะนำของ<br />
-      </p>
-      {data && (
-        <div className="text-center text-[18px] bg-gray-900 p-4 border border-zinc-300 rounded-lg">
-          <p className="text-lg text-gray-300">
-            <b>เลขกระเป๋าผู้แนะนำ:</b> {data.var1.slice(0, 6)}...{data.var1.slice(-4)}
-          </p>
-          <p className="text-lg text-gray-300 mt-2">
-            <b>อีเมล:</b> {data.var2}
-          </p>
-          <p className="text-lg text-gray-300 mt-2">
-            <b>ชื่อ:</b> {data.var3}
-          </p>
-          <p className="text-lg text-red-500 mt-2">
-            <b>Token ID: {data.var4}</b>
-          </p>
+        <div className="flex flex-col gap-2 md:gap-4">
+          <button
+            className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
+              !account || !exchangeRate || isProcessing
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
+            }`}
+            onClick={() => setShowConfirmationModal(true)}
+            disabled={!account || !exchangeRate || isProcessing}
+          >
+            <span className="text-[18px]">
+              {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
+            </span>
+          </button>
         </div>
-      )}
-    </div>
-  );
-};
+        <p className="text-center text-[18px]">
+          <p>
+          เพื่อสนับสนุน <b>แอพพลิเคชั่น <span className="text-[26px] text-red-600">ก๊อกๆๆ</span></b> <br />
+          ถือเป็นการยืนยันสถานภาพ
+          </p>
+          <span className="text-yellow-500 text-[22px]">
+            <b>&quot;สมาชิกพรีเมี่ยม&quot;</b>
+          </span><br />
+          ภายใต้การแนะนำของ<br />
+        </p>
+        {data && (
+          <div className="text-center text-[18px] bg-gray-900 p-4 border border-zinc-300 rounded-lg">
+            <p className="text-lg text-gray-300">
+              <b>เลขกระเป๋าผู้แนะนำ:</b> {data.var1.slice(0, 6)}...{data.var1.slice(-4)}
+            </p>
+            <p className="text-lg text-gray-300 mt-2">
+              <b>อีเมล:</b> {data.var2}
+            </p>
+            <p className="text-lg text-gray-300 mt-2">
+              <b>ชื่อ:</b> {data.var3}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <main className="p-4 pb-10 min-h-[100vh] flex flex-col items-center bg-gray-950">
@@ -288,7 +284,7 @@ const ClaimButtons = () => {
         {data ? (
           <>
             <div className="flex flex-col items-center justify-center w-full p-2 m-2">
-              <ClaimButtons />
+              <PaymentButton />
               
               {/* Confirmation Modal */}
               {showConfirmationModal && (
@@ -342,7 +338,6 @@ const ClaimButtons = () => {
               <p className="mb-3">เลขกระเป๋าผู้แนะนำ:<br /> {data.var1}</p>
               <p className="mb-3">อีเมล: {data.var2}</p>
               <p className="mb-3">ชื่อ: {data.var3}</p>
-              <p>TokenId: {data.var4}</p>
             </div>
           </>
         ) : (
