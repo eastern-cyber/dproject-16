@@ -25,6 +25,11 @@ type UserData = {
   var4: string;
 };
 
+type MemberUser = {
+  userId: string;
+  // Add other fields if needed
+};
+
 const ConfirmPage = () => {
   const [data, setData] = useState<UserData | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
@@ -34,6 +39,8 @@ const ConfirmPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [polBalance, setPolBalance] = useState<string>("0");
+  const [isMember, setIsMember] = useState(false);
+  const [loadingMembership, setLoadingMembership] = useState(false);
   const account = useActiveAccount();
 
   // Fetch wallet balance when account changes
@@ -110,6 +117,35 @@ const ConfirmPage = () => {
     }
   }, []);
 
+  // Check membership status
+  useEffect(() => {
+    const checkMembership = async () => {
+      if (!account?.address) {
+        setIsMember(false);
+        return;
+      }
+
+      setLoadingMembership(true);
+      try {
+        const response = await fetch(
+          "https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/dproject-users.json"
+        );
+        const userList: MemberUser[] = await response.json();
+        const memberExists = userList.some(
+          (user) => user.userId.toLowerCase() === account.address.toLowerCase()
+        );
+        setIsMember(memberExists);
+      } catch (error) {
+        console.error("Error checking membership:", error);
+        setIsMember(false);
+      } finally {
+        setLoadingMembership(false);
+      }
+    };
+
+    checkMembership();
+  }, [account?.address]);
+
   const calculatePolAmount = () => {
     if (!exchangeRate) return null;
     const polAmount = MEMBERSHIP_FEE_THB / exchangeRate;
@@ -117,39 +153,39 @@ const ConfirmPage = () => {
   };
 
   const handleConfirmTransaction = async () => {
-  if (!account || !exchangeRate) return;
-  
-  setIsProcessing(true);
-  try {
-    const polAmount = calculatePolAmount();
-    if (!polAmount) throw new Error("Unable to calculate POL amount");
+    if (!account || !exchangeRate) return;
+    
+    setIsProcessing(true);
+    try {
+      const polAmount = calculatePolAmount();
+      if (!polAmount) throw new Error("Unable to calculate POL amount");
 
-    // Create a prepared transaction for simple value transfer
-    const transaction = prepareContractCall({
-      contract: getContract({
-        client,
-        chain: defineChain(polygon),
-        address: "0x0000000000000000000000000000000000001010" // Native token address
-      }),
-      method: {
-        type: "function",
-        name: "transfer",
-        inputs: [
-          { type: "address", name: "to" },
-          { type: "uint256", name: "value" }
-        ],
-        outputs: [{ type: "bool" }],
-        stateMutability: "payable"
-      },
-      params: [RECIPIENT_ADDRESS, toWei(polAmount)],
-      value: BigInt(toWei(polAmount))
-    });
+      // Create a prepared transaction for simple value transfer
+      const transaction = prepareContractCall({
+        contract: getContract({
+          client,
+          chain: defineChain(polygon),
+          address: "0x0000000000000000000000000000000000001010" // Native token address
+        }),
+        method: {
+          type: "function",
+          name: "transfer",
+          inputs: [
+            { type: "address", name: "to" },
+            { type: "uint256", name: "value" }
+          ],
+          outputs: [{ type: "bool" }],
+          stateMutability: "payable"
+        },
+        params: [RECIPIENT_ADDRESS, toWei(polAmount)],
+        value: BigInt(toWei(polAmount))
+      });
 
-    // Send the transaction
-    const { transactionHash } = await sendTransaction({
-      transaction,
-      account: account
-    });
+      // Send the transaction
+      const { transactionHash } = await sendTransaction({
+        transaction,
+        account: account
+      });
 
       setTxHash(transactionHash);
 
@@ -197,6 +233,14 @@ const ConfirmPage = () => {
   };
 
   const PaymentButton = () => {
+    if (loadingMembership) {
+      return (
+        <div className="flex justify-center py-4">
+          <p className="text-gray-400">กำลังตรวจสอบสถานะสมาชิก...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-4 md:gap-8">
         <p className="mt-4 text-center text-[18px]">
@@ -222,19 +266,28 @@ const ConfirmPage = () => {
           )}
         </p>
         <div className="flex flex-col gap-2 md:gap-4">
-          <button
-            className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
-              !account || !exchangeRate || isProcessing
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
-            }`}
-            onClick={() => setShowConfirmationModal(true)}
-            disabled={!account || !exchangeRate || isProcessing}
-          >
-            <span className="text-[18px]">
-              {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
-            </span>
-          </button>
+          {isMember ? (
+            <button
+              className="flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg bg-gray-600 cursor-not-allowed"
+              disabled
+            >
+              <span className="text-[18px]">ท่านเป็นสมาชิกอยู่แล้ว</span>
+            </button>
+          ) : (
+            <button
+              className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
+                !account || !exchangeRate || isProcessing
+                  ? "bg-gray-600 cursor-not-allowed"
+                  : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
+              }`}
+              onClick={() => setShowConfirmationModal(true)}
+              disabled={!account || !exchangeRate || isProcessing}
+            >
+              <span className="text-[18px]">
+                {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
+              </span>
+            </button>
+          )}
         </div>
         <p className="text-center text-[18px]">
           <p>
@@ -258,8 +311,8 @@ const ConfirmPage = () => {
               <b>ชื่อ:</b> {data.var3}
             </p>
             <p className="text-lg text-red-500 mt-2">
-            <b>Token ID: {data.var4}</b>
-          </p>            
+              <b>Token ID: {data.var4}</b>
+            </p>            
           </div>
         )}
       </div>
