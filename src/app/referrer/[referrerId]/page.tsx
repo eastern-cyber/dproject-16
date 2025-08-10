@@ -5,6 +5,7 @@ import dprojectIcon from "@public/DProjectLogo_650x600.svg";
 import { chain } from "@/app/chain";
 import { client } from "@/app/client";
 import { ConnectButton, darkTheme } from "thirdweb/react";
+import WalletConnect from "@/components/WalletConnect";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -69,7 +70,8 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
                     สมัครใช้งาน
                 </h1>
                 <div className="flex justify-center m-5">
-                    <ConnectButton locale={"en_US"} 
+                    <WalletConnect />
+                    {/* <ConnectButton locale={"en_US"} 
                         client={client}
                         chain={chain}
                         wallets={[ inAppWallet ({
@@ -122,7 +124,7 @@ export default function ReferrerDetails({ params }: { params: { referrerId: stri
                             connectedButtonBgHover: "hsl(241, 50%, 17%)",
                         },
                         })}
-                    />
+                    /> */}
                 </div>
                 <div className="flex flex-col items-center justify-center p-2 m-2">
                     <p className="flex flex-col items-center justify-center text-[20px] m-2 text-center break-word">
