@@ -4,7 +4,7 @@ import { client } from "@/app/client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { inAppWallet, walletConnect } from "thirdweb/wallets";
-import WalletConnect from "@/components/WalletConnect";
+import WalletConnect from "../../../components/WalletConnect";
 import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import dprojectIcon from "@public/DProjectLogo_650x600.svg";
 import { defineChain, getContract } from "thirdweb";
@@ -15,8 +15,13 @@ import { PlanAConfirmModal } from "@/components/planAconfirmModal";
 
 // Constants
 const RECIPIENT_ADDRESS = "0x3BBf139420A8Ecc2D06c64049fE6E7aE09593944";
-const MEMBERSHIP_FEE_THB = 400;
 const EXCHANGE_RATE_REFRESH_INTERVAL = 300000; // 5 minutes in ms
+export const MEMBERSHIP_FEE_THB = 400; // <-- add 'export' here
+
+
+// Calculate THB amounts
+const seventyPercentTHB = MEMBERSHIP_FEE_THB * 0.7;
+const thirtyPercentTHB = MEMBERSHIP_FEE_THB * 0.3;
 
 type UserData = {
   var1: string;
@@ -152,85 +157,126 @@ const ConfirmPage = () => {
     return polAmount.toFixed(4); // Return as string with 4 decimal places
   };
 
-  const handleConfirmTransaction = async () => {
-    if (!account || !exchangeRate) return;
-    
-    setIsProcessing(true);
-    try {
-      const polAmount = calculatePolAmount();
-      if (!polAmount) throw new Error("Unable to calculate POL amount");
+const handleConfirmTransaction = async () => {
+  if (!account || !exchangeRate || !data?.var1) return;
+  
+  setIsProcessing(true);
+  try {
+    const totalPolAmount = calculatePolAmount();
+    if (!totalPolAmount) throw new Error("Unable to calculate POL amount");
 
-      // Create a prepared transaction for simple value transfer
-      const transaction = prepareContractCall({
-        contract: getContract({
-          client,
-          chain: defineChain(polygon),
-          address: "0x0000000000000000000000000000000000001010" // Native token address
-        }),
-        method: {
-          type: "function",
-          name: "transfer",
-          inputs: [
-            { type: "address", name: "to" },
-            { type: "uint256", name: "value" }
-          ],
-          outputs: [{ type: "bool" }],
-          stateMutability: "payable"
+    const totalAmountWei = toWei(totalPolAmount);
+    const seventyPercentWei = BigInt(Math.floor(Number(totalAmountWei) * 0.7));
+    const thirtyPercentWei = BigInt(totalAmountWei) - seventyPercentWei;
+
+    // First transaction: 70% to fixed recipient
+    const transaction1 = prepareContractCall({
+      contract: getContract({
+        client,
+        chain: defineChain(polygon),
+        address: "0x0000000000000000000000000000000000001010" // Native token address
+      }),
+      method: {
+        type: "function",
+        name: "transfer",
+        inputs: [
+          { type: "address", name: "to" },
+          { type: "uint256", name: "value" }
+        ],
+        outputs: [{ type: "bool" }],
+        stateMutability: "payable"
+      },
+      params: [RECIPIENT_ADDRESS, seventyPercentWei],
+      value: seventyPercentWei
+    });
+
+    // Second transaction: 30% to referrer
+    const transaction2 = prepareContractCall({
+      contract: getContract({
+        client,
+        chain: defineChain(polygon),
+        address: "0x0000000000000000000000000000000000001010" // Native token address
+      }),
+      method: {
+        type: "function",
+        name: "transfer",
+        inputs: [
+          { type: "address", name: "to" },
+          { type: "uint256", name: "value" }
+        ],
+        outputs: [{ type: "bool" }],
+        stateMutability: "payable"
+      },
+      params: [data.var1, thirtyPercentWei],
+      value: thirtyPercentWei
+    });
+
+    // Execute transactions sequentially
+    const { transactionHash: txHash1 } = await sendTransaction({
+      transaction: transaction1,
+      account: account
+    });
+
+    const { transactionHash: txHash2 } = await sendTransaction({
+      transaction: transaction2,
+      account: account
+    });
+
+    // Create confirmation report with both transactions
+    const now = new Date();
+    const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // GMT+7
+    const formattedDate = bkkTime.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).replace(/\//g, '/');
+
+    const report = {
+      senderAddress: account.address,
+      dateTime: formattedDate,
+      referrer: data.var1,
+      transactions: [
+        {
+          recipient: RECIPIENT_ADDRESS,
+          amountPOL: (Number(seventyPercentWei) / 10**18).toFixed(4),
+          amountTHB: (MEMBERSHIP_FEE_THB * 0.7).toFixed(2),
+          transactionHash: txHash1
         },
-        params: [RECIPIENT_ADDRESS, toWei(polAmount)],
-        value: BigInt(toWei(polAmount))
-      });
+        {
+          recipient: data.var1,
+          amountPOL: (Number(thirtyPercentWei) / 10**18).toFixed(4),
+          amountTHB: (MEMBERSHIP_FEE_THB * 0.3).toFixed(2),
+          transactionHash: txHash2
+        }
+      ],
+      totalAmountPOL: totalPolAmount,
+      totalAmountTHB: MEMBERSHIP_FEE_THB
+    };
 
-      // Send the transaction
-      const { transactionHash } = await sendTransaction({
-        transaction,
-        account: account
-      });
+    // Download report as JSON
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'planAconfirmReport.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-      setTxHash(transactionHash);
-
-      // Create confirmation report
-      const now = new Date();
-      const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // GMT+7
-      const formattedDate = bkkTime.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).replace(/\//g, '/');
-
-      const report = {
-        senderAddress: account.address,
-        dateTime: formattedDate,
-        referrer: data?.var1 || "",
-        transactionHash: transactionHash,
-        amountPOL: polAmount,
-        amountTHB: MEMBERSHIP_FEE_THB
-      };
-
-      // Download report as JSON
-      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'planAconfirmReport.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      alert("การชำระเงินเรียบร้อยแล้ว");
-    } catch (err) {
-      console.error("Transaction failed:", err);
-      alert("การทำรายการล้มเหลว: " + (err as Error).message);
-    } finally {
-      setIsProcessing(false);
-      setShowConfirmationModal(false);
-    }
-  };
+    alert("การชำระเงินเรียบร้อยแล้ว");
+  } catch (err) {
+    console.error("Transaction failed:", err);
+    alert("การทำรายการล้มเหลว: " + (err as Error).message);
+  } finally {
+    setIsProcessing(false);
+    setShowConfirmationModal(false);
+  }
+};
 
   const PaymentButton = () => {
     if (loadingMembership) {
@@ -348,14 +394,20 @@ const ConfirmPage = () => {
                   <div className="p-6 bg-gray-900 rounded-lg border border-gray-700 max-w-md">
                     <h3 className="text-xl font-bold mb-4 text-center">ยืนยันการชำระ</h3>
                     <div className="mb-6 text-center">
-                      <p className="text-lg">
-                        คุณกำลังจะชำระค่าสมาชิกจำนวน<br />
-                        <span className="text-yellow-500 text-2xl font-bold">
+                      <p className="text-[18px]">
+                        ค่าสมาชิกจำนวน<br />
+                        <span className="text-yellow-500 text-[22px] font-bold">
                           {MEMBERSHIP_FEE_THB} THB (≈ {calculatePolAmount()} POL)
                         </span>
+                        <p className="text-yellow-500 text-2xl font-bold">
+                          <ul className="text-[18px] mt-1 mb-4">
+                            <li>{(MEMBERSHIP_FEE_THB * 0.7).toFixed(0)} THB เข้าระบบ</li>
+                            <li>{(MEMBERSHIP_FEE_THB * 0.3).toFixed(0)} THB เข้าผู้แนะนำ (PR Bonus)</li>
+                          </ul>
+                        </p>
                       </p>
                       {account && (
-                        <p className="mt-3 text-sm">
+                        <p className="mt-3 text-[16]">
                           POL ในกระเป๋าของคุณ: <span className="text-green-400">{polBalance}</span>
                         </p>
                       )}
