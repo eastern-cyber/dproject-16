@@ -18,7 +18,6 @@ const RECIPIENT_ADDRESS = "0x3BBf139420A8Ecc2D06c64049fE6E7aE09593944";
 const EXCHANGE_RATE_REFRESH_INTERVAL = 300000; // 5 minutes in ms
 const MEMBERSHIP_FEE_THB = 400; // <-- add 'export' here
 
-
 // Calculate THB amounts
 const seventyPercentTHB = MEMBERSHIP_FEE_THB * 0.7;
 const thirtyPercentTHB = MEMBERSHIP_FEE_THB * 0.3;
@@ -36,6 +35,9 @@ type MemberUser = {
 };
 
 const ConfirmPage = () => {
+  // Tracking transaction completion
+  const [isTransactionComplete, setIsTransactionComplete] = useState(false);
+
   const [data, setData] = useState<UserData | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,6 +49,18 @@ const ConfirmPage = () => {
   const [isMember, setIsMember] = useState(false);
   const [loadingMembership, setLoadingMembership] = useState(false);
   const account = useActiveAccount();
+
+  // useEffect hook to handle the redirection when transaction completes
+  useEffect(() => {
+    if (isTransactionComplete) {
+      // Redirect after a short delay to allow user to see the success message
+      const timer = setTimeout(() => {
+        window.location.href = "https://dfi.fund/member-area";
+      }, 2000); // 2 second delay before redirect
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTransactionComplete]);
 
   // Fetch wallet balance when account changes
   useEffect(() => {
@@ -269,6 +283,8 @@ const handleConfirmTransaction = async () => {
     URL.revokeObjectURL(url);
 
     alert("การชำระเงินเรียบร้อยแล้ว");
+    setIsTransactionComplete(true); // Set completion state
+
   } catch (err) {
     console.error("Transaction failed:", err);
     alert("การทำรายการล้มเหลว: " + (err as Error).message);
