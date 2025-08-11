@@ -12,7 +12,7 @@ import { claimTo as claimERC20, balanceOf as balanceOfERC20 } from "thirdweb/ext
 import { contract } from "../../../utils/contracts";
 import { getContractMetadata } from "thirdweb/extensions/common";
 import Link from "next/link";
-import WalletConnect from "@/components/WalletConnect";
+import WalletConnect from "../../components/WalletConnect";
 import Footer from "@/components/Footer";
 
 export default function Refferrer() {
