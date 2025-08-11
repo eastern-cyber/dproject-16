@@ -1,6 +1,6 @@
 // components/planAconfirmModal.tsx
 import { useEffect } from "react";
-import { MEMBERSHIP_FEE_THB } from "../app/referrer/confirm/page";
+// import { MEMBERSHIP_FEE_THB } from "../app/referrer/confirm/page";
 
 
 interface PlanAConfirmModalProps {

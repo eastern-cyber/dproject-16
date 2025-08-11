@@ -16,7 +16,7 @@ import { PlanAConfirmModal } from "@/components/planAconfirmModal";
 // Constants
 const RECIPIENT_ADDRESS = "0x3BBf139420A8Ecc2D06c64049fE6E7aE09593944";
 const EXCHANGE_RATE_REFRESH_INTERVAL = 300000; // 5 minutes in ms
-export const MEMBERSHIP_FEE_THB = 400; // <-- add 'export' here
+const MEMBERSHIP_FEE_THB = 400; // <-- add 'export' here
 
 
 // Calculate THB amounts
