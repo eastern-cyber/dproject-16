@@ -24,6 +24,7 @@ export default function Footer() {
             <li className="hover:text-blue-300 hover:font-semibold"><Link href="/about">About - ข้อมูลโครงการ</Link></li>
             <li className="hover:text-blue-300 hover:font-semibold"><Link href="/timeline">Timeline - ความคืบหน้า</Link></li>
             <li className="hover:text-blue-300 hover:font-semibold"><Link href="/member-area/">MemberArea - พื้นที่สมาชิก</Link></li>
+            <li className="hover:text-blue-300 hover:font-semibold"><Link href="http://www.dpjdd.com/">DOS - ตรวจสอบส่วนแบ่งรายได้</Link></li>
           </ul>
         </div>
 
