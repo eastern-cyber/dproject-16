@@ -138,6 +138,13 @@ const Timeline: React.FC = () => {
             </div>                      
             <div className="timeline-item">
                 <div className="timeline-content">
+                <ul><b>15.07.2025</b></ul>
+                <h3><a target="_blank" href="https://3k.dfi.fund/templates/index.html/"><b>Kok Kok Kok v. 2.0.1</b></a></h3>
+                <p><a target="_blank" href="https://3k.dfi.fund/templates/index.html/">ต้นแบบแอพพลิเคชั่น ก๊อกๆๆ เวอร์ชั่น 2.0.1</a></p>
+                </div>
+            </div>                      
+            <div className="timeline-item">
+                <div className="timeline-content">
                 {/* <ul><b>20.02.2025</b></ul> */}
                 <h3><b>To be continue ... ยังมีต่อ โปรดรอติดตาม</b></h3>
                 {/* <p>3K Application ก๊อกๆๆ ที่สามารถใช้งานได้ ใกล้เคียงเวอร์ชั่นสมบูรณ์มากยิ่งขึ้น</p> */}

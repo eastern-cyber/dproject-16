@@ -38,7 +38,7 @@ export default function Footer() {
             <a href="https://www.instagram.com/kokkokkok.3k?igsh=emNrZ2tta2drdzV2" target="_blank" aria-label="Instagram"><Instagram className="w-6 h-6 text-gray-300 hover:text-orange-500" /></a>
             <a href="https://lin.ee/xGUnJcK" target="_blank" aria-label="Line App"><span className="text-[22px] font-bold text-gray-300 hover:text-yellow-400">Line</span></a>
           </div>
-          <p className="text-[20px] font-bold mt-4"><span className="text-red-500">Kok</span><span className="text-yellow-500">Kok</span><span className="text-green-500">Kok</span><sup className="text-[10px] font-bold">TM</sup></p>
+          <a target="_blank" href="https://3k.dfi.fund/templates/index.html"><p className="text-[20px] font-bold mt-4"><span className="text-red-500">Kok</span><span className="text-yellow-500">Kok</span><span className="text-green-500">Kok</span><sup className="text-[10px] font-bold">TM</sup></p></a>
           <p className="text-[16px] text-gray-200 mt-0"><b>Web3 SuperApp</b> for the Future.</p>
         </div>
       </div>
