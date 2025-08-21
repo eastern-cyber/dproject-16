@@ -352,15 +352,18 @@ const handleConfirmTransaction = async () => {
           </p></b>
           {exchangeRate && adjustedExchangeRate && (
             <>
-              <span className="text-[17px]">
+              {/* <span className="text-[17px]">
                 อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL
               </span><br />
               <span className="text-[17px] text-green-400">
                 อัตราที่ใช้คำนวณ (ป้องกันความผันผวน): {adjustedExchangeRate.toFixed(2)} THB/POL
+              </span><br /> */}
+              <span className="text-[17px] text-green-400">
+                อัตราแลกเปลี่ยน: {adjustedExchangeRate.toFixed(2)} THB/POL
               </span><br />
-              <span className="text-[14px] text-gray-400">
+              {/* <span className="text-[14px] text-gray-400">
                 (อัตราปัจจุบัน - {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)
-              </span>
+              </span> */}
             </>
           )}
           {loading && !error && (
