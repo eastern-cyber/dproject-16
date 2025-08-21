@@ -16,7 +16,8 @@ import { PlanAConfirmModal } from "@/components/planAconfirmModal";
 // Constants
 const RECIPIENT_ADDRESS = "0x3BBf139420A8Ecc2D06c64049fE6E7aE09593944";
 const EXCHANGE_RATE_REFRESH_INTERVAL = 300000; // 5 minutes in ms
-const MEMBERSHIP_FEE_THB = 400; // <-- add 'export' here
+const MEMBERSHIP_FEE_THB = 400;
+const EXCHANGE_RATE_BUFFER = 0.1; // 0.1 THB buffer to protect against fluctuations
 
 // Calculate THB amounts
 const seventyPercentTHB = MEMBERSHIP_FEE_THB * 0.7;
@@ -30,8 +31,8 @@ type UserData = {
 };
 
 type MemberUser = {
-  userId: string;
-  // Add other fields if needed
+  userId?: string;
+  walletAddress?: string;
 };
 
 const ConfirmPage = () => {
@@ -40,6 +41,7 @@ const ConfirmPage = () => {
 
   const [data, setData] = useState<UserData | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [adjustedExchangeRate, setAdjustedExchangeRate] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -50,13 +52,17 @@ const ConfirmPage = () => {
   const [loadingMembership, setLoadingMembership] = useState(false);
   const account = useActiveAccount();
 
+  // Calculate adjusted exchange rate (current rate - 0.1 THB buffer)
+  const calculateAdjustedExchangeRate = (currentRate: number): number => {
+    return Math.max(0.01, currentRate - EXCHANGE_RATE_BUFFER); // Ensure rate doesn't go below 0.01
+  };
+
   // useEffect hook to handle the redirection when transaction completes
   useEffect(() => {
     if (isTransactionComplete) {
-      // Redirect after a short delay to allow user to see the success message
       const timer = setTimeout(() => {
         window.location.href = "https://dfi.fund/member-area";
-      }, 2000); // 2 second delay before redirect
+      }, 2000);
       
       return () => clearTimeout(timer);
     }
@@ -75,7 +81,7 @@ const ConfirmPage = () => {
           contract: getContract({
             client,
             chain: defineChain(polygon),
-            address: "0x0000000000000000000000000000000000001010" // Native MATIC token address
+            address: "0x0000000000000000000000000000000000001010"
           }),
           method: {
             type: "function",
@@ -87,7 +93,6 @@ const ConfirmPage = () => {
           params: [account.address]
         });
 
-        // Convert balance from wei to POL (MATIC)
         const balanceInPOL = Number(balanceResult) / 10**18;
         setPolBalance(balanceInPOL.toFixed(4));
       } catch (err) {
@@ -99,7 +104,7 @@ const ConfirmPage = () => {
     fetchBalance();
   }, [account]);
 
-  // Fetch THB to POL exchange rate (MATIC price in THB)
+  // Fetch THB to POL exchange rate and calculate adjusted rate
   useEffect(() => {
     const fetchExchangeRate = async () => {
       try {
@@ -109,7 +114,11 @@ const ConfirmPage = () => {
         if (!response.ok) throw new Error("Failed to fetch exchange rate");
         
         const data = await response.json();
-        setExchangeRate(data["matic-network"].thb);
+        const currentRate = data["matic-network"].thb;
+        const adjustedRate = calculateAdjustedExchangeRate(currentRate);
+        
+        setExchangeRate(currentRate);
+        setAdjustedExchangeRate(adjustedRate);
         setError(null);
       } catch (err) {
         setError("ไม่สามารถโหลดอัตราแลกเปลี่ยนได้");
@@ -136,7 +145,7 @@ const ConfirmPage = () => {
     }
   }, []);
 
-  // Check membership status
+  // Check membership status with new JSON structure
   useEffect(() => {
     const checkMembership = async () => {
       if (!account?.address) {
@@ -147,12 +156,29 @@ const ConfirmPage = () => {
       setLoadingMembership(true);
       try {
         const response = await fetch(
-          "https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/dproject-users.json"
+          "https://raw.githubusercontent.com/eastern-cyber/dproject-admin-1.0.2/main/public/dProjectUsers.json"
         );
-        const userList: MemberUser[] = await response.json();
-        const memberExists = userList.some(
-          (user) => user.userId.toLowerCase() === account.address.toLowerCase()
-        );
+        if (!response.ok) throw new Error("Failed to fetch membership data");
+        
+        const data = await response.json();
+        
+        let userList: MemberUser[] = [];
+        
+        if (Array.isArray(data)) {
+          userList = data;
+        } else if (data.users && Array.isArray(data.users)) {
+          userList = data.users;
+        } else if (typeof data === 'object') {
+          userList = Object.values(data).filter((item): item is MemberUser => 
+            item && typeof item === 'object'
+          );
+        }
+
+        const memberExists = userList.some((user) => {
+          const userIdentifier = user.userId || user.walletAddress;
+          return userIdentifier && userIdentifier.toLowerCase() === account.address.toLowerCase();
+        });
+        
         setIsMember(memberExists);
       } catch (error) {
         console.error("Error checking membership:", error);
@@ -166,13 +192,21 @@ const ConfirmPage = () => {
   }, [account?.address]);
 
   const calculatePolAmount = () => {
+    // Use the adjusted exchange rate (weaker rate) for calculation
+    if (!adjustedExchangeRate) return null;
+    const polAmount = MEMBERSHIP_FEE_THB / adjustedExchangeRate;
+    return polAmount.toFixed(4);
+  };
+
+  const calculatePolAmountWithCurrentRate = () => {
+    // Calculate with current rate for display purposes only
     if (!exchangeRate) return null;
     const polAmount = MEMBERSHIP_FEE_THB / exchangeRate;
-    return polAmount.toFixed(4); // Return as string with 4 decimal places
+    return polAmount.toFixed(4);
   };
 
 const handleConfirmTransaction = async () => {
-  if (!account || !exchangeRate || !data?.var1) return;
+  if (!account || !adjustedExchangeRate || !data?.var1) return;
   
   setIsProcessing(true);
   try {
@@ -188,7 +222,7 @@ const handleConfirmTransaction = async () => {
       contract: getContract({
         client,
         chain: defineChain(polygon),
-        address: "0x0000000000000000000000000000000000001010" // Native token address
+        address: "0x0000000000000000000000000000000000001010"
       }),
       method: {
         type: "function",
@@ -209,7 +243,7 @@ const handleConfirmTransaction = async () => {
       contract: getContract({
         client,
         chain: defineChain(polygon),
-        address: "0x0000000000000000000000000000000000001010" // Native token address
+        address: "0x0000000000000000000000000000000000001010"
       }),
       method: {
         type: "function",
@@ -238,7 +272,7 @@ const handleConfirmTransaction = async () => {
 
     // Create confirmation report with both transactions
     const now = new Date();
-    const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // GMT+7
+    const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     const formattedDate = bkkTime.toLocaleString('en-GB', {
       day: '2-digit',
       month: '2-digit',
@@ -253,6 +287,9 @@ const handleConfirmTransaction = async () => {
       senderAddress: account.address,
       dateTime: formattedDate,
       referrer: data.var1,
+      currentExchangeRate: exchangeRate,
+      adjustedExchangeRate: adjustedExchangeRate,
+      exchangeRateBuffer: EXCHANGE_RATE_BUFFER,
       transactions: [
         {
           recipient: RECIPIENT_ADDRESS,
@@ -283,7 +320,7 @@ const handleConfirmTransaction = async () => {
     URL.revokeObjectURL(url);
 
     alert("การชำระเงินเรียบร้อยแล้ว");
-    setIsTransactionComplete(true); // Set completion state
+    setIsTransactionComplete(true);
 
   } catch (err) {
     console.error("Transaction failed:", err);
@@ -307,17 +344,23 @@ const handleConfirmTransaction = async () => {
       <div className="flex flex-col gap-4 md:gap-8">
         <p className="mt-4 text-center text-[18px]">
           <b>ค่าสมาชิก: <p className="text-yellow-500 text-[22px]">{MEMBERSHIP_FEE_THB} THB
-          {exchangeRate && (
+          {adjustedExchangeRate && (
             <>
                 &nbsp; ( ≈ {calculatePolAmount()} POL )
             </>
           )}
           </p></b>
-          {exchangeRate && (
+          {exchangeRate && adjustedExchangeRate && (
             <>
               <span className="text-[17px]">
-                อัตราแลกเปลี่ยน: {exchangeRate.toFixed(2)} THB/POL
+                อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL
               </span><br />
+              <span className="text-[17px] text-green-400">
+                อัตราที่ใช้คำนวณ (ป้องกันความผันผวน): {adjustedExchangeRate.toFixed(2)} THB/POL
+              </span><br />
+              <span className="text-[14px] text-gray-400">
+                (อัตราปัจจุบัน - {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)
+              </span>
             </>
           )}
           {loading && !error && (
@@ -338,12 +381,12 @@ const handleConfirmTransaction = async () => {
           ) : (
             <button
               className={`flex flex-col mt-1 border border-zinc-100 px-4 py-3 rounded-lg transition-colors ${
-                !account || !exchangeRate || isProcessing
+                !account || !adjustedExchangeRate || isProcessing
                   ? "bg-gray-600 cursor-not-allowed"
                   : "bg-red-700 hover:bg-red-800 hover:border-zinc-400"
               }`}
               onClick={() => setShowConfirmationModal(true)}
-              disabled={!account || !exchangeRate || isProcessing}
+              disabled={!account || !adjustedExchangeRate || isProcessing}
             >
               <span className="text-[18px]">
                 {!account ? "กรุณาเชื่อมต่อกระเป๋า" : "ดำเนินการต่อ"}
@@ -422,6 +465,13 @@ const handleConfirmTransaction = async () => {
                           </ul>
                         </p>
                       </p>
+                      {exchangeRate && adjustedExchangeRate && (
+                        <div className="mt-3 text-sm text-gray-300">
+                          <p>อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL</p>
+                          <p className="text-green-400">อัตราที่ใช้คำนวณ: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
+                          <p className="text-gray-400">(ลดลง {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)</p>
+                        </div>
+                      )}
                       {account && (
                         <p className="mt-3 text-[16]">
                           POL ในกระเป๋าของคุณ: <span className="text-green-400">{polBalance}</span>
