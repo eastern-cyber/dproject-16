@@ -168,9 +168,9 @@ const ConfirmPage = () => {
           userList = data;
         } else if (data.users && Array.isArray(data.users)) {
           userList = data.users;
-        } else if (typeof data === 'object') {
+        } else if (typeof data === 'object' && data !== null) {
           userList = Object.values(data).filter((item): item is MemberUser => 
-            item && typeof item === 'object'
+            item !== null && typeof item === 'object'
           );
         }
 
