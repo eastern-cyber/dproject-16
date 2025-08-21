@@ -469,10 +469,13 @@ const handleConfirmTransaction = async () => {
                         </p>
                       </p>
                       {exchangeRate && adjustedExchangeRate && (
+                        // <div className="mt-3 text-sm text-gray-300">
+                        //   <p>อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL</p>
+                        //   <p className="text-green-400">อัตราที่ใช้คำนวณ: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
+                        //   <p className="text-gray-400">(ลดลง {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)</p>
+                        // </div>
                         <div className="mt-3 text-sm text-gray-300">
-                          <p>อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL</p>
-                          <p className="text-green-400">อัตราที่ใช้คำนวณ: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
-                          <p className="text-gray-400">(ลดลง {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)</p>
+                          <p>อัตราแลกเปลี่ยน: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
                         </div>
                       )}
                       {account && (
