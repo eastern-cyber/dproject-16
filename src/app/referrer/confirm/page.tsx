@@ -33,11 +33,26 @@ type UserData = {
 type MemberUser = {
   userId?: string;
   walletAddress?: string;
+  referrerId?: string;
+  email?: string;
+  name?: string;
+  tokenId?: number;
+  // userCreated?: string;
+  planA?: {
+    dateTime: string;
+    POL: string;
+    rateTHBPOL: string;
+  };
+};
+
+type GitHubUserData = {
+  [key: string]: MemberUser;
 };
 
 const ConfirmPage = () => {
   // Tracking transaction completion
   const [isTransactionComplete, setIsTransactionComplete] = useState(false);
+  const [ipfsHash, setIpfsHash] = useState<string | null>(null);
 
   const [data, setData] = useState<UserData | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
@@ -52,21 +67,44 @@ const ConfirmPage = () => {
   const [loadingMembership, setLoadingMembership] = useState(false);
   const account = useActiveAccount();
 
-  // Calculate adjusted exchange rate (current rate - 0.1 THB buffer)
-  const calculateAdjustedExchangeRate = (currentRate: number): number => {
-    return Math.max(0.01, currentRate - EXCHANGE_RATE_BUFFER); // Ensure rate doesn't go below 0.01
+  // Function to test GitHub connection
+  const testConnection = async () => {
+    try {
+      const response = await fetch('/api/github/test');
+      const result = await response.json();
+      console.log('GitHub connection test result:', result.success);
+    } catch (error) {
+      console.error('GitHub connection test failed:', error);
+    }
   };
 
-  // useEffect hook to handle the redirection when transaction completes
-  useEffect(() => {
-    if (isTransactionComplete) {
-      const timer = setTimeout(() => {
-        window.location.href = "https://dfi.fund/member-area";
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+  // Function to add user to GitHub via API route
+  const addUserToGitHub = async (userData: MemberUser) => {
+    try {
+      const response = await fetch('/api/github/add-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error adding user to GitHub:', error);
+      throw error;
     }
-  }, [isTransactionComplete]);
+  };
+
+  // Test GitHub connection on component mount
+  useEffect(() => {
+    testConnection();
+  }, []);
 
   // Fetch wallet balance when account changes
   useEffect(() => {
@@ -115,7 +153,7 @@ const ConfirmPage = () => {
         
         const data = await response.json();
         const currentRate = data["matic-network"].thb;
-        const adjustedRate = calculateAdjustedExchangeRate(currentRate);
+        const adjustedRate = Math.max(0.01, currentRate - EXCHANGE_RATE_BUFFER);
         
         setExchangeRate(currentRate);
         setAdjustedExchangeRate(adjustedRate);
@@ -192,144 +230,192 @@ const ConfirmPage = () => {
   }, [account?.address]);
 
   const calculatePolAmount = () => {
-    // Use the adjusted exchange rate (weaker rate) for calculation
     if (!adjustedExchangeRate) return null;
     const polAmount = MEMBERSHIP_FEE_THB / adjustedExchangeRate;
     return polAmount.toFixed(4);
   };
 
   const calculatePolAmountWithCurrentRate = () => {
-    // Calculate with current rate for display purposes only
     if (!exchangeRate) return null;
     const polAmount = MEMBERSHIP_FEE_THB / exchangeRate;
     return polAmount.toFixed(4);
   };
 
-const handleConfirmTransaction = async () => {
-  if (!account || !adjustedExchangeRate || !data?.var1) return;
-  
-  setIsProcessing(true);
-  try {
-    const totalPolAmount = calculatePolAmount();
-    if (!totalPolAmount) throw new Error("Unable to calculate POL amount");
-
-    const totalAmountWei = toWei(totalPolAmount);
-    const seventyPercentWei = BigInt(Math.floor(Number(totalAmountWei) * 0.7));
-    const thirtyPercentWei = BigInt(totalAmountWei) - seventyPercentWei;
-
-    // First transaction: 70% to fixed recipient
-    const transaction1 = prepareContractCall({
-      contract: getContract({
-        client,
-        chain: defineChain(polygon),
-        address: "0x0000000000000000000000000000000000001010"
-      }),
-      method: {
-        type: "function",
-        name: "transfer",
-        inputs: [
-          { type: "address", name: "to" },
-          { type: "uint256", name: "value" }
-        ],
-        outputs: [{ type: "bool" }],
-        stateMutability: "payable"
-      },
-      params: [RECIPIENT_ADDRESS, seventyPercentWei],
-      value: seventyPercentWei
-    });
-
-    // Second transaction: 30% to referrer
-    const transaction2 = prepareContractCall({
-      contract: getContract({
-        client,
-        chain: defineChain(polygon),
-        address: "0x0000000000000000000000000000000000001010"
-      }),
-      method: {
-        type: "function",
-        name: "transfer",
-        inputs: [
-          { type: "address", name: "to" },
-          { type: "uint256", name: "value" }
-        ],
-        outputs: [{ type: "bool" }],
-        stateMutability: "payable"
-      },
-      params: [data.var1, thirtyPercentWei],
-      value: thirtyPercentWei
-    });
-
-    // Execute transactions sequentially
-    const { transactionHash: txHash1 } = await sendTransaction({
-      transaction: transaction1,
-      account: account
-    });
-
-    const { transactionHash: txHash2 } = await sendTransaction({
-      transaction: transaction2,
-      account: account
-    });
-
-    // Create confirmation report with both transactions
-    const now = new Date();
-    const bkkTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const formattedDate = bkkTime.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    }).replace(/\//g, '/');
-
-    const report = {
-      senderAddress: account.address,
-      dateTime: formattedDate,
-      referrer: data.var1,
-      currentExchangeRate: exchangeRate,
-      adjustedExchangeRate: adjustedExchangeRate,
-      exchangeRateBuffer: EXCHANGE_RATE_BUFFER,
-      transactions: [
-        {
-          recipient: RECIPIENT_ADDRESS,
-          amountPOL: (Number(seventyPercentWei) / 10**18).toFixed(4),
-          amountTHB: (MEMBERSHIP_FEE_THB * 0.7).toFixed(2),
-          transactionHash: txHash1
+  // IPFS Storage Function
+  const storeReportInIPFS = async (report: any) => {
+    try {
+      const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`
         },
-        {
-          recipient: data.var1,
-          amountPOL: (Number(thirtyPercentWei) / 10**18).toFixed(4),
-          amountTHB: (MEMBERSHIP_FEE_THB * 0.3).toFixed(2),
-          transactionHash: txHash2
+        body: JSON.stringify({
+          pinataContent: report,
+          pinataMetadata: {
+            name: `membership-payment-${Date.now()}.json`
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to store report in IPFS');
+      
+      const data = await response.json();
+      return data.IpfsHash;
+    } catch (error) {
+      console.error("Error storing report in IPFS:", error);
+      throw error;
+    }
+  };
+
+  const handleConfirmTransaction = async () => {
+    if (!account || !adjustedExchangeRate || !data?.var1) return;
+    
+    setIsProcessing(true);
+    try {
+      const totalPolAmount = calculatePolAmount();
+      if (!totalPolAmount) throw new Error("Unable to calculate POL amount");
+
+      const totalAmountWei = toWei(totalPolAmount);
+      const seventyPercentWei = BigInt(Math.floor(Number(totalAmountWei) * 0.7));
+      const thirtyPercentWei = BigInt(totalAmountWei) - seventyPercentWei;
+
+      // First transaction: 70% to fixed recipient
+      const transaction1 = prepareContractCall({
+        contract: getContract({
+          client,
+          chain: defineChain(polygon),
+          address: "0x0000000000000000000000000000000000001010"
+        }),
+        method: {
+          type: "function",
+          name: "transfer",
+          inputs: [
+            { type: "address", name: "to" },
+            { type: "uint256", name: "value" }
+          ],
+          outputs: [{ type: "bool" }],
+          stateMutability: "payable"
+        },
+        params: [RECIPIENT_ADDRESS, seventyPercentWei],
+        value: seventyPercentWei
+      });
+
+      // Second transaction: 30% to referrer
+      const transaction2 = prepareContractCall({
+        contract: getContract({
+          client,
+          chain: defineChain(polygon),
+          address: "0x0000000000000000000000000000000000001010"
+        }),
+        method: {
+          type: "function",
+          name: "transfer",
+          inputs: [
+            { type: "address", name: "to" },
+            { type: "uint256", name: "value" }
+          ],
+          outputs: [{ type: "bool" }],
+          stateMutability: "payable"
+        },
+        params: [data.var1, thirtyPercentWei],
+        value: thirtyPercentWei
+      });
+
+      // Execute transactions sequentially
+      const { transactionHash: txHash1 } = await sendTransaction({
+        transaction: transaction1,
+        account: account
+      });
+
+      const { transactionHash: txHash2 } = await sendTransaction({
+        transaction: transaction2,
+        account: account
+      });
+
+      // FIXED: Get current time in Bangkok timezone (UTC+7) correctly
+      const now = new Date();
+      // Create Bangkok time by using toLocaleString with timeZone option
+      const formattedDate = now.toLocaleString('en-GB', {
+        timeZone: 'Asia/Bangkok',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(',', ''); // Remove comma between date and time
+
+      const report = {
+        senderAddress: account.address,
+        dateTime: formattedDate,
+        timezone: "Asia/Bangkok (UTC+7)",
+        referrer: data.var1,
+        currentExchangeRate: exchangeRate,
+        adjustedExchangeRate: adjustedExchangeRate,
+        exchangeRateBuffer: EXCHANGE_RATE_BUFFER,
+        transactions: [
+          {
+            recipient: RECIPIENT_ADDRESS,
+            amountPOL: (Number(seventyPercentWei) / 10**18).toFixed(4),
+            amountTHB: (MEMBERSHIP_FEE_THB * 0.7).toFixed(2),
+            transactionHash: txHash1
+          },
+          {
+            recipient: data.var1,
+            amountPOL: (Number(thirtyPercentWei) / 10**18).toFixed(4),
+            amountTHB: (MEMBERSHIP_FEE_THB * 0.3).toFixed(2),
+            transactionHash: txHash2
+          }
+        ],
+        totalAmountPOL: totalPolAmount,
+        totalAmountTHB: MEMBERSHIP_FEE_THB
+      };
+
+      // After successful transactions, add user to GitHub
+      try {
+        const newUser = {
+          userId: account.address,
+          referrerId: data.var1,
+          email: data.var2 || "",
+          name: data.var3 || "",
+          // Let API handle tokenId assignment
+          planA: {
+            dateTime: formattedDate,
+            POL: totalPolAmount,
+            rateTHBPOL: adjustedExchangeRate.toFixed(2)
+          }
+        };
+
+        const result = await addUserToGitHub(newUser);
+        console.log('User added to GitHub successfully with tokenId:', result.tokenId);
+        
+        // Update the displayed tokenId if needed
+        if (result.tokenId) {
+          // You might want to update your UI to show the actual tokenId
+          console.log('Assigned tokenId:', result.tokenId);
         }
-      ],
-      totalAmountPOL: totalPolAmount,
-      totalAmountTHB: MEMBERSHIP_FEE_THB
-    };
+      } catch (githubError) {
+        console.warn('GitHub update failed, continuing without GitHub update:', githubError);
+        // Continue without throwing error
+      }
 
-    // Download report as JSON
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'planAconfirmReport.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      // Store report in IPFS instead of downloading locally
+      const ipfsHash = await storeReportInIPFS(report);
+      setIpfsHash(ipfsHash);
 
-    alert("การชำระเงินเรียบร้อยแล้ว");
-    setIsTransactionComplete(true);
+      alert(`การชำระเงินเรียบร้อยแล้ว! รายงานถูกเก็บไว้ใน IPFS`);
+      setIsTransactionComplete(true);
 
-  } catch (err) {
-    console.error("Transaction failed:", err);
-    alert("การทำรายการล้มเหลว: " + (err as Error).message);
-  } finally {
-    setIsProcessing(false);
-    setShowConfirmationModal(false);
-  }
-};
+    } catch (err) {
+      console.error("Transaction failed:", err);
+      alert("การทำรายการล้มเหลว: " + (err as Error).message);
+    } finally {
+      setIsProcessing(false);
+      setShowConfirmationModal(false);
+    }
+  };
 
   const PaymentButton = () => {
     if (loadingMembership) {
@@ -352,18 +438,9 @@ const handleConfirmTransaction = async () => {
           </p></b>
           {exchangeRate && adjustedExchangeRate && (
             <>
-              {/* <span className="text-[17px]">
-                อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL
-              </span><br />
-              <span className="text-[17px] text-green-400">
-                อัตราที่ใช้คำนวณ (ป้องกันความผันผวน): {adjustedExchangeRate.toFixed(2)} THB/POL
-              </span><br /> */}
               <span className="text-[17px] text-green-400">
                 อัตราแลกเปลี่ยน: {adjustedExchangeRate.toFixed(2)} THB/POL
               </span><br />
-              {/* <span className="text-[14px] text-gray-400">
-                (อัตราปัจจุบัน - {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)
-              </span> */}
             </>
           )}
           {loading && !error && (
@@ -469,11 +546,6 @@ const handleConfirmTransaction = async () => {
                         </p>
                       </p>
                       {exchangeRate && adjustedExchangeRate && (
-                        // <div className="mt-3 text-sm text-gray-300">
-                        //   <p>อัตราแลกเปลี่ยนปัจจุบัน: {exchangeRate.toFixed(2)} THB/POL</p>
-                        //   <p className="text-green-400">อัตราที่ใช้คำนวณ: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
-                        //   <p className="text-gray-400">(ลดลง {EXCHANGE_RATE_BUFFER} THB เพื่อป้องกันความผันผวน)</p>
-                        // </div>
                         <div className="mt-3 text-sm text-gray-300">
                           <p>อัตราแลกเปลี่ยน: {adjustedExchangeRate.toFixed(2)} THB/POL</p>
                         </div>
@@ -523,6 +595,25 @@ const handleConfirmTransaction = async () => {
           </>
         ) : (
           <p className="text-red-400 py-4">ไม่พบข้อมูลผู้แนะนำ</p>
+        )}
+
+        {isTransactionComplete && ipfsHash && (
+          <div className="mt-4 p-4 bg-green-900 border border-green-400 rounded-lg">
+            <p className="text-green-200 text-center">
+              รายงานถูกเก็บไว้ใน IPFS สำเร็จ!
+            </p>
+            <p className="text-green-200 text-sm text-center mt-2">
+              Hash: {ipfsHash.slice(0, 12)}...{ipfsHash.slice(-8)}
+            </p>
+            <a
+              href={`https://gateway.pinata.cloud/ipfs/${ipfsHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-center text-blue-300 underline mt-2"
+            >
+              ดูรายงานใน IPFS
+            </a>
+          </div>
         )}
       </div>
       <div className='w-full mt-8'>
